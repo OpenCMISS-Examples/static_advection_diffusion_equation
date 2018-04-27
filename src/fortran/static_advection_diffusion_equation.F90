@@ -1,4 +1,4 @@
-PROGRAM STATIC_ADVECTION_DIFFUSION_EQUATION
+PROGRAM StaticAdvectionDiffusionEquation
 
   USE OpenCMISS
   USE OpenCMISS_Iron
@@ -55,7 +55,9 @@ PROGRAM STATIC_ADVECTION_DIFFUSION_EQUATION
 
   TYPE(cmfe_BasisType) :: Basis
   TYPE(cmfe_BoundaryConditionsType) :: BoundaryConditions
-  TYPE(cmfe_CoordinateSystemType) :: CoordinateSystem,WorldCoordinateSystem
+  TYPE(cmfe_ComputationEnvironmentType) :: computationEnvironment
+  TYPE(cmfe_ContextType) :: context
+  TYPE(cmfe_CoordinateSystemType) :: CoordinateSystem
   TYPE(cmfe_DecompositionType) :: Decomposition
   TYPE(cmfe_EquationsType) :: Equations
   TYPE(cmfe_EquationsSetType) :: EquationsSet
@@ -99,9 +101,11 @@ PROGRAM STATIC_ADVECTION_DIFFUSION_EQUATION
   !-----------------------------------------------------------------------------------------------------------
 
   !Intialise OpenCMISS
-  CALL cmfe_Initialise(WorldCoordinateSystem,WorldRegion,Err)
-
-  CALL cmfe_ErrorHandlingModeSet(CMFE_ERRORS_TRAP_ERROR,Err)
+  CALL cmfe_Context_Initialise(context,err)
+  CALL cmfe_Initialise(context,err)
+  CALL cmfe_ErrorHandlingModeSet(CMFE_ERRORS_TRAP_ERROR,err)
+  CALL cmfe_Region_Initialise(worldRegion,err)
+  CALL cmfe_Context_WorldRegionGet(context,worldRegion,err)
 
   NUMBER_GLOBAL_X_ELEMENTS=80
   NUMBER_GLOBAL_Y_ELEMENTS=160
@@ -119,7 +123,7 @@ PROGRAM STATIC_ADVECTION_DIFFUSION_EQUATION
 
   !Start the creation of a new RC coordinate system
   CALL cmfe_CoordinateSystem_Initialise(CoordinateSystem,Err)
-  CALL cmfe_CoordinateSystem_CreateStart(CoordinateSystemUserNumber,CoordinateSystem,Err)
+  CALL cmfe_CoordinateSystem_CreateStart(CoordinateSystemUserNumber,context,CoordinateSystem,Err)
   IF(NUMBER_GLOBAL_Z_ELEMENTS==0) THEN
     !Set the coordinate system to be 2D
     CALL cmfe_CoordinateSystem_DimensionSet(CoordinateSystem,2,Err)
@@ -149,7 +153,7 @@ PROGRAM STATIC_ADVECTION_DIFFUSION_EQUATION
   
   !Start the creation of a basis (default is trilinear lagrange)
   CALL cmfe_Basis_Initialise(Basis,Err)
-  CALL cmfe_Basis_CreateStart(BasisUserNumber,Basis,Err)
+  CALL cmfe_Basis_CreateStart(BasisUserNumber,context,Basis,Err)
   IF(NUMBER_GLOBAL_Z_ELEMENTS==0) THEN
     !Set the basis to be a bilinear Lagrange basis
     CALL cmfe_Basis_NumberOfXiSet(Basis,2,Err)
@@ -318,7 +322,7 @@ PROGRAM STATIC_ADVECTION_DIFFUSION_EQUATION
 
   !Create the problem
   CALL cmfe_Problem_Initialise(Problem,Err)
-  CALL cmfe_Problem_CreateStart(ProblemUserNumber,[CMFE_PROBLEM_CLASSICAL_FIELD_CLASS, &
+  CALL cmfe_Problem_CreateStart(ProblemUserNumber,context,[CMFE_PROBLEM_CLASSICAL_FIELD_CLASS, &
     & CMFE_PROBLEM_ADVECTION_DIFFUSION_EQUATION_TYPE,CMFE_PROBLEM_LINEAR_SOURCE_STATIC_ADVEC_DIFF_SUBTYPE],Problem,Err)
   !Finish the creation of a problem
   CALL cmfe_Problem_CreateFinish(Problem,Err)
@@ -413,11 +417,11 @@ PROGRAM STATIC_ADVECTION_DIFFUSION_EQUATION
   ENDIF
 
   !Finialise CMISS
-  CALL cmfe_Finalise(Err)
+  CALL cmfe_Finalise(context,Err)
 
 
   WRITE(*,'(A)') "Program successfully completed."
   
   STOP
 
-END PROGRAM STATIC_ADVECTION_DIFFUSION_EQUATION
+END PROGRAM StaticAdvectionDiffusionEquation
