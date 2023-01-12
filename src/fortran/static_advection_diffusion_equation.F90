@@ -1,13 +1,9 @@
-PROGRAM StaticAdvectionDiffusionEquation
+ PROGRAM StaticAdvectionDiffusionEquation
 
   USE OpenCMISS
   USE OpenCMISS_Iron
 #ifndef NOMPIMOD
   USE MPI
-#endif
-
-#ifdef WIN32
-  USE IFQWIN
 #endif
 
   IMPLICIT NONE
@@ -23,82 +19,55 @@ PROGRAM StaticAdvectionDiffusionEquation
   REAL(CMISSRP), PARAMETER :: HEIGHT=1.0_CMISSRP
   REAL(CMISSRP), PARAMETER :: WIDTH=2.0_CMISSRP
   REAL(CMISSRP), PARAMETER :: LENGTH=3.0_CMISSRP 
-  REAL(CMISSRP), POINTER :: GEOMETRIC_PARAMETERS(:)
   
-  INTEGER(CMISSIntg), PARAMETER :: ContextUserNumber=1
-  INTEGER(CMISSIntg), PARAMETER :: CoordinateSystemUserNumber=1
-  INTEGER(CMISSIntg), PARAMETER :: RegionUserNumber=2
-  INTEGER(CMISSIntg), PARAMETER :: BasisUserNumber=3
-  INTEGER(CMISSIntg), PARAMETER :: GeneratedMeshUserNumber=4
-  INTEGER(CMISSIntg), PARAMETER :: MeshUserNumber=5
-  INTEGER(CMISSIntg), PARAMETER :: DecompositionUserNumber=6
-  INTEGER(CMISSIntg), PARAMETER :: DecomposerUserNumber=7
-  INTEGER(CMISSIntg), PARAMETER :: GeometricFieldUserNumber=8
-  INTEGER(CMISSIntg), PARAMETER :: EquationsSetFieldUserNumber=9
-  INTEGER(CMISSIntg), PARAMETER :: DependentFieldUserNumber=10
-  INTEGER(CMISSIntg), PARAMETER :: MaterialsFieldUserNumber=11
-  INTEGER(CMISSIntg), PARAMETER :: EquationsSetUserNumber=12
-  INTEGER(CMISSIntg), PARAMETER :: ProblemUserNumber=13
-  INTEGER(CMISSIntg), PARAMETER :: ControlLoopNode=0
-  INTEGER(CMISSIntg), PARAMETER :: IndependentFieldUserNumber=14
-  INTEGER(CMISSIntg), PARAMETER :: AnalyticFieldUserNumber=15
-  INTEGER(CMISSIntg), PARAMETER :: SourceFieldUserNumber=16
+  INTEGER(CMISSIntg), PARAMETER :: CONTEXT_USER_NUMBER=1
+  INTEGER(CMISSIntg), PARAMETER :: COORDINATE_SYSTEM_USER_NUMBER=2
+  INTEGER(CMISSIntg), PARAMETER :: REGION_USER_NUMBER=3
+  INTEGER(CMISSIntg), PARAMETER :: BASIS_USER_NUMBER=4
+  INTEGER(CMISSIntg), PARAMETER :: GENERATED_MESH_USER_NUMBER=5
+  INTEGER(CMISSIntg), PARAMETER :: MESH_USER_NUMBER=6
+  INTEGER(CMISSIntg), PARAMETER :: DECOMPOSITION_USER_NUMBER=7
+  INTEGER(CMISSIntg), PARAMETER :: DECOMPOSER_USER_NUMBER=8
+  INTEGER(CMISSIntg), PARAMETER :: GEOMETRIC_FIELD_USER_NUMBER=9
+  INTEGER(CMISSIntg), PARAMETER :: EQUATIONS_SET_FIELD_USER_NUMBER=10
+  INTEGER(CMISSIntg), PARAMETER :: DEPENDENT_FIELD_USER_NUMBER=11
+  INTEGER(CMISSIntg), PARAMETER :: MATERIALS_FIELD_USER_NUMBER=12
+  INTEGER(CMISSIntg), PARAMETER :: INDEPENDENT_FIELD_USER_NUMBER=13
+  INTEGER(CMISSIntg), PARAMETER :: ANALYTIC_FIELD_USER_NUMBER=14
+  INTEGER(CMISSIntg), PARAMETER :: SOURCE_FIELD_USER_NUMBER=15
+  INTEGER(CMISSIntg), PARAMETER :: EQUATIONS_SET_USER_NUMBER=16
+  INTEGER(CMISSIntg), PARAMETER :: PROBLEM_USER_NUMBER=17
   
   !Program types
   
   !Program variables
 
-  INTEGER(CMISSIntg) :: NUMBER_GLOBAL_X_ELEMENTS,NUMBER_GLOBAL_Y_ELEMENTS,NUMBER_GLOBAL_Z_ELEMENTS
+  INTEGER(CMISSIntg) :: numberOfGlobalXElements,numberOfGlobalYElements,numberOfGlobalZElements
+  INTEGER(CMISSIntg) :: decompositionIndex,equationsSetIndex
+  INTEGER(CMISSIntg) :: numberOfComputationNodes,computationNodeNumber
+  INTEGER(CMISSIntg) :: err
+  LOGICAL :: exportField
   
-  INTEGER(CMISSIntg) :: MPI_IERROR
-  
-  !CMISS variables
+  !OpenCMISS variables
 
-  TYPE(cmfe_BasisType) :: Basis
-  TYPE(cmfe_BoundaryConditionsType) :: BoundaryConditions
+  TYPE(cmfe_BasisType) :: basis
+  TYPE(cmfe_BoundaryConditionsType) :: boundaryConditions
   TYPE(cmfe_ComputationEnvironmentType) :: computationEnvironment
   TYPE(cmfe_ContextType) :: context
-  TYPE(cmfe_CoordinateSystemType) :: CoordinateSystem
-  TYPE(cmfe_DecompositionType) :: Decomposition
-  TYPE(cmfe_DecomposerType) :: Decomposer
-  TYPE(cmfe_EquationsType) :: Equations
-  TYPE(cmfe_EquationsSetType) :: EquationsSet
-  TYPE(cmfe_FieldType) :: GeometricField,EquationsSetField,DependentField,MaterialsField,IndependentField,AnalyticField,SourceField
-  TYPE(cmfe_FieldsType) :: Fields
-  TYPE(cmfe_GeneratedMeshType) :: GeneratedMesh  
-  TYPE(cmfe_MeshType) :: Mesh
-  TYPE(cmfe_ProblemType) :: Problem
-  TYPE(cmfe_ControlLoopType) :: ControlLoop
-  TYPE(cmfe_RegionType) :: Region,WorldRegion
-  TYPE(cmfe_SolverType) :: Solver, LinearSolver
-  TYPE(cmfe_SolverEquationsType) :: SolverEquations
+  TYPE(cmfe_CoordinateSystemType) :: coordinateSystem
+  TYPE(cmfe_DecompositionType) :: decomposition
+  TYPE(cmfe_DecomposerType) :: decomposer
+  TYPE(cmfe_EquationsType) :: equations
+  TYPE(cmfe_EquationsSetType) :: equationsSet
+  TYPE(cmfe_FieldType) :: geometricField,equationsSetField,dependentField,materialsField,independentField,analyticField,sourceField
+  TYPE(cmfe_FieldsType) :: fields
+  TYPE(cmfe_GeneratedMeshType) :: generatedMesh  
+  TYPE(cmfe_MeshType) :: mesh
+  TYPE(cmfe_ProblemType) :: problem
+  TYPE(cmfe_RegionType) :: region,worldRegion
+  TYPE(cmfe_SolverType) :: solver
+  TYPE(cmfe_SolverEquationsType) :: solverEquations
   TYPE(cmfe_WorkGroupType) :: worldWorkGroup
-
-  LOGICAL :: EXPORT_FIELD,IMPORT_FIELD
- 
-#ifdef WIN32
-  !Quickwin type
-  LOGICAL :: QUICKWIN_STATUS=.FALSE.
-  TYPE(WINDOWCONFIG) :: QUICKWIN_WINDOW_CONFIG
-#endif
-  
-  !Generic CMISS variables
-  
-  INTEGER(CMISSIntg) :: decompositionIndex,EquationsSetIndex
-  INTEGER(CMISSIntg) :: numberOfComputationNodes,computationNodeNumber
-  INTEGER(CMISSIntg) :: FirstNodeNumber,LastNodeNumber
-  INTEGER(CMISSIntg) :: Err
-  
-#ifdef WIN32
-  !Initialise QuickWin
-  QUICKWIN_WINDOW_CONFIG%TITLE="General Output" !Window title
-  QUICKWIN_WINDOW_CONFIG%NUMTEXTROWS=-1 !Max possible number of rows
-  QUICKWIN_WINDOW_CONFIG%MODE=QWIN$SCROLLDOWN
-  !Set the window parameters
-  QUICKWIN_STATUS=SETWINDOWCONFIG(QUICKWIN_WINDOW_CONFIG)
-  !If attempt fails set with system estimated values
-  IF(.NOT.QUICKWIN_STATUS) QUICKWIN_STATUS=SETWINDOWCONFIG(QUICKWIN_WINDOW_CONFIG)
-#endif
 
   !-----------------------------------------------------------------------------------------------------------
   ! PROBLEM CONTROL PANEL
@@ -109,7 +78,7 @@ PROGRAM StaticAdvectionDiffusionEquation
   CALL cmfe_ErrorHandlingModeSet(CMFE_ERRORS_TRAP_ERROR,err)
   !Create a context
   CALL cmfe_Context_Initialise(context,err)
-  CALL cmfe_Context_Create(ContextUserNumber,context,err)
+  CALL cmfe_Context_Create(CONTEXT_USER_NUMBER,context,err)
   CALL cmfe_Region_Initialise(worldRegion,err)
   CALL cmfe_Context_WorldRegionGet(context,worldRegion,err)
 
@@ -122,101 +91,97 @@ PROGRAM StaticAdvectionDiffusionEquation
   CALL cmfe_WorkGroup_NumberOfGroupNodesGet(worldWorkGroup,numberOfComputationNodes,err)
   CALL cmfe_WorkGroup_GroupNodeNumberGet(worldWorkGroup,computationNodeNumber,err)
 
-  NUMBER_GLOBAL_X_ELEMENTS=80
-  NUMBER_GLOBAL_Y_ELEMENTS=160
-  NUMBER_GLOBAL_Z_ELEMENTS=0
-
-  CALL MPI_BCAST(NUMBER_GLOBAL_X_ELEMENTS,1,MPI_INTEGER,0,MPI_COMM_WORLD,MPI_IERROR)
-  CALL MPI_BCAST(NUMBER_GLOBAL_Y_ELEMENTS,1,MPI_INTEGER,0,MPI_COMM_WORLD,MPI_IERROR)
-  CALL MPI_BCAST(NUMBER_GLOBAL_Z_ELEMENTS,1,MPI_INTEGER,0,MPI_COMM_WORLD,MPI_IERROR)
+  numberOfGlobalXElements=80
+  numberOfGlobalYElements=160
+  numberOfGlobalZElements=0
 
   !-----------------------------------------------------------------------------------------------------------
   ! COORDINATE SYSTEM
   !-----------------------------------------------------------------------------------------------------------
 
   !Start the creation of a new RC coordinate system
-  CALL cmfe_CoordinateSystem_Initialise(CoordinateSystem,Err)
-  CALL cmfe_CoordinateSystem_CreateStart(CoordinateSystemUserNumber,context,CoordinateSystem,Err)
-  IF(NUMBER_GLOBAL_Z_ELEMENTS==0) THEN
+  CALL cmfe_CoordinateSystem_Initialise(coordinateSystem,err)
+  CALL cmfe_CoordinateSystem_CreateStart(COORDINATE_SYSTEM_USER_NUMBER,context,coordinateSystem,err)
+  IF(numberOfGlobalZElements==0) THEN
     !Set the coordinate system to be 2D
-    CALL cmfe_CoordinateSystem_DimensionSet(CoordinateSystem,2,Err)
+    CALL cmfe_CoordinateSystem_DimensionSet(coordinateSystem,2,err)
   ELSE
     !Set the coordinate system to be 3D
-    CALL cmfe_CoordinateSystem_DimensionSet(CoordinateSystem,3,Err)
+    CALL cmfe_CoordinateSystem_DimensionSet(coordinateSystem,3,err)
   ENDIF
   !Finish the creation of the coordinate system
-  CALL cmfe_CoordinateSystem_CreateFinish(CoordinateSystem,Err)
+  CALL cmfe_CoordinateSystem_CreateFinish(coordinateSystem,err)
   
   !-----------------------------------------------------------------------------------------------------------
   ! REGION
   !-----------------------------------------------------------------------------------------------------------  
   
   !Start the creation of the region
-  CALL cmfe_Region_Initialise(Region,Err)
-  CALL cmfe_Region_CreateStart(RegionUserNumber,WorldRegion,Region,Err)  
-  CALL cmfe_Region_LabelSet(Region,"static_advection_diffusion_equation",Err)
+  CALL cmfe_Region_Initialise(region,err)
+  CALL cmfe_Region_CreateStart(REGION_USER_NUMBER,worldRegion,region,err)  
+  CALL cmfe_Region_LabelSet(region,"static_advection_diffusion_equation",err)
   !Set the regions coordinate system to the 2D RC coordinate system that we have created
-  CALL cmfe_Region_CoordinateSystemSet(Region,CoordinateSystem,Err)
+  CALL cmfe_Region_CoordinateSystemSet(region,coordinateSystem,err)
   !Finish the creation of the region
-  CALL cmfe_Region_CreateFinish(Region,Err)
+  CALL cmfe_Region_CreateFinish(region,err)
   
   !-----------------------------------------------------------------------------------------------------------
   ! BASIS
   !-----------------------------------------------------------------------------------------------------------   
   
   !Start the creation of a basis (default is trilinear lagrange)
-  CALL cmfe_Basis_Initialise(Basis,Err)
-  CALL cmfe_Basis_CreateStart(BasisUserNumber,context,Basis,Err)
-  IF(NUMBER_GLOBAL_Z_ELEMENTS==0) THEN
+  CALL cmfe_Basis_Initialise(basis,err)
+  CALL cmfe_Basis_CreateStart(BASIS_USER_NUMBER,context,basis,err)
+  IF(numberOfGlobalZElements==0) THEN
     !Set the basis to be a bilinear Lagrange basis
-    CALL cmfe_Basis_NumberOfXiSet(Basis,2,Err)
+    CALL cmfe_Basis_NumberOfXiSet(basis,2,err)
   ELSE
     !Set the basis to be a trilinear Lagrange basis
-    CALL cmfe_Basis_NumberOfXiSet(Basis,3,Err)
+    CALL cmfe_Basis_NumberOfXiSet(basis,3,err)
   ENDIF
   !Finish the creation of the basis
-  CALL cmfe_Basis_CreateFinish(BASIS,Err)
+  CALL cmfe_Basis_CreateFinish(basis,err)
   
   !-----------------------------------------------------------------------------------------------------------
   ! MESH
   !-----------------------------------------------------------------------------------------------------------  
   
   !Start the creation of a generated mesh in the region
-  CALL cmfe_GeneratedMesh_Initialise(GeneratedMesh,Err)
-  CALL cmfe_GeneratedMesh_CreateStart(GeneratedMeshUserNumber,Region,GeneratedMesh,Err)
+  CALL cmfe_GeneratedMesh_Initialise(generatedMesh,err)
+  CALL cmfe_GeneratedMesh_CreateStart(GENERATED_MESH_USER_NUMBER,region,generatedMesh,err)
   !Set up a regular x*y*z mesh
-  CALL cmfe_GeneratedMesh_TypeSet(GeneratedMesh,CMFE_GENERATED_MESH_REGULAR_MESH_TYPE,Err)
+  CALL cmfe_GeneratedMesh_TypeSet(generatedMesh,CMFE_GENERATED_MESH_REGULAR_MESH_TYPE,err)
   !Set the default basis
-  CALL cmfe_GeneratedMesh_BasisSet(GeneratedMesh,Basis,Err)   
+  CALL cmfe_GeneratedMesh_BasisSet(generatedMesh,basis,err)   
   !Define the mesh on the region
-  IF(NUMBER_GLOBAL_Z_ELEMENTS==0) THEN
-    CALL cmfe_GeneratedMesh_ExtentSet(GeneratedMesh,[WIDTH,HEIGHT],Err)
-    CALL cmfe_GeneratedMesh_NumberOfElementsSet(GeneratedMesh,[NUMBER_GLOBAL_X_ELEMENTS,NUMBER_GLOBAL_Y_ELEMENTS],Err)
+  IF(numberOfGlobalZElements==0) THEN
+    CALL cmfe_GeneratedMesh_ExtentSet(generatedMesh,[WIDTH,HEIGHT],err)
+    CALL cmfe_GeneratedMesh_NumberOfElementsSet(generatedMesh,[numberOfGlobalXElements,numberOfGlobalYElements],err)
   ELSE
-    CALL cmfe_GeneratedMesh_ExtentSet(GeneratedMesh,[WIDTH,HEIGHT,LENGTH],Err)
-    CALL cmfe_GeneratedMesh_NumberOfElementsSet(GeneratedMesh,[NUMBER_GLOBAL_X_ELEMENTS,NUMBER_GLOBAL_Y_ELEMENTS, &
-      & NUMBER_GLOBAL_Z_ELEMENTS],Err)
+    CALL cmfe_GeneratedMesh_ExtentSet(generatedMesh,[WIDTH,HEIGHT,LENGTH],err)
+    CALL cmfe_GeneratedMesh_NumberOfElementsSet(generatedMesh,[numberOfGlobalXElements,numberOfGlobalYElements, &
+      & numberOfGlobalZElements],err)
   ENDIF
   !Finish the creation of a generated mesh in the region
-  CALL cmfe_Mesh_Initialise(Mesh,Err)
-  CALL cmfe_GeneratedMesh_CreateFinish(GeneratedMesh,MeshUserNumber,Mesh,Err)
+  CALL cmfe_Mesh_Initialise(mesh,err)
+  CALL cmfe_GeneratedMesh_CreateFinish(generatedMesh,MESH_USER_NUMBER,mesh,err)
   
   !-----------------------------------------------------------------------------------------------------------
   ! DECOMPOSITION
   !----------------------------------------------------------------------------------------------------------- 
   
   !Create a decomposition
-  CALL cmfe_Decomposition_Initialise(Decomposition,Err)
-  CALL cmfe_Decomposition_CreateStart(DecompositionUserNumber,Mesh,Decomposition,Err)
+  CALL cmfe_Decomposition_Initialise(decomposition,err)
+  CALL cmfe_Decomposition_CreateStart(DECOMPOSITION_USER_NUMBER,mesh,decomposition,err)
   !Finish the decomposition
-  CALL cmfe_Decomposition_CreateFinish(Decomposition,Err)
+  CALL cmfe_Decomposition_CreateFinish(decomposition,err)
   
   !-----------------------------------------------------------------------------------------------------------
   ! DECOMPOSER
   !----------------------------------------------------------------------------------------------------------- 
   
   CALL cmfe_Decomposer_Initialise(decomposer,err)
-  CALL cmfe_Decomposer_CreateStart(decomposerUserNumber,region,worldWorkGroup,decomposer,err)
+  CALL cmfe_Decomposer_CreateStart(DECOMPOSER_USER_NUMBER,region,worldWorkGroup,decomposer,err)
   !Add in the decomposition
   CALL cmfe_Decomposer_DecompositionAdd(decomposer,decomposition,decompositionIndex,err)
   !Finish the decomposer
@@ -226,42 +191,42 @@ PROGRAM StaticAdvectionDiffusionEquation
   ! GEOMETRIC FIELD
   !-----------------------------------------------------------------------------------------------------------  
   
-  CALL cmfe_Field_Initialise(GeometricField,Err)
-  CALL cmfe_Field_CreateStart(GeometricFieldUserNumber,Region,GeometricField,Err)
-  CALL cmfe_Field_DecompositionSet(GeometricField,Decomposition,Err)
-  CALL cmfe_Field_ComponentMeshComponentSet(GeometricField,CMFE_FIELD_U_VARIABLE_TYPE,1,1,Err)
-  CALL cmfe_Field_ComponentMeshComponentSet(GeometricField,CMFE_FIELD_U_VARIABLE_TYPE,2,1,Err)
-  IF(NUMBER_GLOBAL_Z_ELEMENTS/=0) THEN
-    CALL cmfe_Field_ComponentMeshComponentSet(GeometricField,CMFE_FIELD_U_VARIABLE_TYPE,3,1,Err)
+  CALL cmfe_Field_Initialise(geometricField,err)
+  CALL cmfe_Field_CreateStart(GEOMETRIC_FIELD_USER_NUMBER,region,geometricField,err)
+  CALL cmfe_Field_DecompositionSet(geometricField,decomposition,err)
+  CALL cmfe_Field_ComponentMeshComponentSet(geometricField,CMFE_FIELD_U_VARIABLE_TYPE,1,1,err)
+  CALL cmfe_Field_ComponentMeshComponentSet(geometricField,CMFE_FIELD_U_VARIABLE_TYPE,2,1,err)
+  IF(numberOfGlobalZElements/=0) THEN
+    CALL cmfe_Field_ComponentMeshComponentSet(geometricField,CMFE_FIELD_U_VARIABLE_TYPE,3,1,err)
   ENDIF
-  CALL cmfe_Field_CreateFinish(GeometricField,Err)
-  CALL cmfe_GeneratedMesh_GeometricParametersCalculate(GeneratedMesh,GeometricField,Err)
+  CALL cmfe_Field_CreateFinish(geometricField,err)
+  CALL cmfe_GeneratedMesh_GeometricParametersCalculate(generatedMesh,geometricField,err)
   
   !-----------------------------------------------------------------------------------------------------------
   ! EQUATIONS SETS
   !-----------------------------------------------------------------------------------------------------------  
 
   !Create the equations_sets  
-  CALL cmfe_EquationsSet_Initialise(EquationsSet,Err)
-  CALL cmfe_Field_Initialise(EquationsSetField,Err)
+  CALL cmfe_EquationsSet_Initialise(equationsSet,err)
+  CALL cmfe_Field_Initialise(equationsSetField,err)
   !Set equations_sets to be static advection-diffusion with constant source term
-  CALL cmfe_EquationsSet_CreateStart(EquationsSetUserNumber,Region,GeometricField,[CMFE_EQUATIONS_SET_CLASSICAL_FIELD_CLASS, &
+  CALL cmfe_EquationsSet_CreateStart(EQUATIONS_SET_USER_NUMBER,region,geometricField,[CMFE_EQUATIONS_SET_CLASSICAL_FIELD_CLASS, &
     & CMFE_EQUATIONS_SET_ADVECTION_DIFFUSION_EQUATION_TYPE,CMFE_EQUATIONS_SET_GENERALISED_STATIC_ADVEC_DIFF_SUBTYPE], &
-    & EquationsSetFieldUserNumber,EquationsSetField,EquationsSet,Err)
-  CALL cmfe_EquationsSet_CreateFinish(EquationsSet,Err)
+    & EQUATIONS_SET_FIELD_USER_NUMBER,equationsSetField,equationsSet,err)
+  CALL cmfe_EquationsSet_CreateFinish(equationsSet,err)
   
   !-----------------------------------------------------------------------------------------------------------
   ! DEPENDENT FIELD
   !----------------------------------------------------------------------------------------------------------- 
   
   !Create the equations set dependent field variables
-  CALL cmfe_Field_Initialise(DependentField,Err)
-  CALL cmfe_EquationsSet_DependentCreateStart(EquationsSet,DependentFieldUserNumber,DependentField,Err)
+  CALL cmfe_Field_Initialise(dependentField,err)
+  CALL cmfe_EquationsSet_DependentCreateStart(equationsSet,DEPENDENT_FIELD_USER_NUMBER,dependentField,err)
   !Set labels for primary and secondary variables
-  CALL cmfe_Field_VariableLabelSet(DependentField,CMFE_FIELD_U_VARIABLE_TYPE,"u",Err)
-  CALL cmfe_Field_VariableLabelSet(DependentField,CMFE_FIELD_DELUDELN_VARIABLE_TYPE,"deludeln",Err)
+  CALL cmfe_Field_VariableLabelSet(dependentField,CMFE_FIELD_U_VARIABLE_TYPE,"u",err)
+  CALL cmfe_Field_VariableLabelSet(dependentField,CMFE_FIELD_DELUDELN_VARIABLE_TYPE,"deludeln",err)
   !Finish the equations set dependent field variables
-  CALL cmfe_EquationsSet_DependentCreateFinish(EquationsSet,Err)
+  CALL cmfe_EquationsSet_DependentCreateFinish(equationsSet,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! SOURCE FIELD
@@ -271,170 +236,155 @@ PROGRAM StaticAdvectionDiffusionEquation
   !For comparison withe analytical solution used here, the source field must be set to the following:
   !f(x,y) = 2.0*tanh(-0.1E1+Alpha*(TanPhi*x-y))*(1.0-pow(tanh(-0.1E1+Alpha*(TanPhi*x-y)),2.0))*Alpha*Alpha*TanPhi*TanPhi
   !+2.0*tanh(-0.1E1+Alpha*(TanPhi*x-y))*(1.0-pow(tanh(-0.1E1+Alpha*(TanPhi*x-y)),2.0))*Alpha*Alpha
-  !-Peclet*(-sin(6.0*y)*(1.0-pow(tanh(-0.1E1+Alpha*(TanPhi*x-y)),2.0))*Alpha*TanPhi+cos(6.0*x)*(1.0-pow(tanh(-0.1E1+Alpha*(TanPhi*x-y)),2.0))*Alpha)
-  CALL cmfe_Field_Initialise(SourceField,Err)
-  CALL cmfe_EquationsSet_SourceCreateStart(EquationsSet,SourceFieldUserNumber,SourceField,Err)
-  CALL cmfe_Field_ComponentInterpolationSet(SourceField,CMFE_FIELD_U_VARIABLE_TYPE,1,CMFE_FIELD_NODE_BASED_INTERPOLATION,Err)
+  !-Peclet*(-sin(6.0*y)*(1.0-pow(tanh(-0.1E1+Alpha*(TanPhi*x-y)),2.0))*Alpha*TanPhi+cos(6.0*x)*
+  !(1.0-pow(tanh(-0.1E1+Alpha*(TanPhi*x-y)),2.0))*Alpha)
+  
+  CALL cmfe_Field_Initialise(sourceField,err)
+  CALL cmfe_EquationsSet_SourceCreateStart(equationsSet,SOURCE_FIELD_USER_NUMBER,sourceField,err)
+  CALL cmfe_Field_ComponentInterpolationSet(sourceField,CMFE_FIELD_U_VARIABLE_TYPE,1,CMFE_FIELD_NODE_BASED_INTERPOLATION,err)
   !Set label for the source field 
-  CALL cmfe_Field_VariableLabelSet(SourceField,CMFE_FIELD_U_VARIABLE_TYPE,"source",Err)
+  CALL cmfe_Field_VariableLabelSet(sourceField,CMFE_FIELD_U_VARIABLE_TYPE,"source",err)
   !Finish the equations set source field variable
-  CALL cmfe_EquationsSet_SourceCreateFinish(EquationsSet,Err)
+  CALL cmfe_EquationsSet_SourceCreateFinish(equationsSet,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! INDEPENDENT FIELD
   !-----------------------------------------------------------------------------------------------------------
 
   !Create the equations set independent field variable
-  CALL cmfe_Field_Initialise(IndependentField,Err)
-  CALL cmfe_EquationsSet_IndependentCreateStart(EquationsSet,IndependentFieldUserNumber,IndependentField,Err)
+  CALL cmfe_Field_Initialise(independentField,err)
+  CALL cmfe_EquationsSet_IndependentCreateStart(equationsSet,INDEPENDENT_FIELD_USER_NUMBER,independentField,err)
   !Set label for the independent field
-  CALL cmfe_Field_VariableLabelSet(IndependentField,CMFE_FIELD_U_VARIABLE_TYPE,"velocity",Err)
+  CALL cmfe_Field_VariableLabelSet(independentField,CMFE_FIELD_U_VARIABLE_TYPE,"velocity",err)
   !Finish the equations set independent field variable
-  CALL cmfe_EquationsSet_IndependentCreateFinish(EquationsSet,Err)
+  CALL cmfe_EquationsSet_IndependentCreateFinish(equationsSet,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! MATERIAL FIELD
   !-----------------------------------------------------------------------------------------------------------
   
   !Create the equations set materials field variable 
-  CALL cmfe_Field_Initialise(MaterialsField,Err)
-  CALL cmfe_EquationsSet_MaterialsCreateStart(EquationsSet,MaterialsFieldUserNumber,MaterialsField,Err)
+  CALL cmfe_Field_Initialise(materialsField,err)
+  CALL cmfe_EquationsSet_MaterialsCreateStart(equationsSet,MATERIALS_FIELD_USER_NUMBER,materialsField,err)
   !Set label for the materials field
-  CALL cmfe_Field_VariableLabelSet(MaterialsField,CMFE_FIELD_U_VARIABLE_TYPE,"diffusivity",Err)
+  CALL cmfe_Field_VariableLabelSet(materialsField,CMFE_FIELD_U_VARIABLE_TYPE,"diffusivity",err)
   !Finish the equations set materials field variable
-  CALL cmfe_EquationsSet_MaterialsCreateFinish(EquationsSet,Err)
+  CALL cmfe_EquationsSet_MaterialsCreateFinish(equationsSet,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! ANALYTICAL FIELD
   !-----------------------------------------------------------------------------------------------------------
 
   !Create the equations set analytical field variables
-  CALL cmfe_Field_Initialise(AnalyticField,Err)
-  IF(NUMBER_GLOBAL_Z_ELEMENTS==0) THEN  
-    CALL cmfe_EquationsSet_AnalyticCreateStart(EquationsSet,CMFE_EQUATIONS_SET_ADVECTION_DIFFUSION_EQUATION_TWO_DIM_1,&
-      & AnalyticFieldUserNumber,AnalyticField,Err)
+  CALL cmfe_Field_Initialise(analyticField,err)
+  IF(numberOfGlobalZElements==0) THEN  
+    CALL cmfe_EquationsSet_AnalyticCreateStart(equationsSet,CMFE_EQUATIONS_SET_ADVECTION_DIFFUSION_EQUATION_TWO_DIM_1,&
+      & ANALYTIC_FIELD_USER_NUMBER,analyticField,err)
   ELSE
     WRITE(*,'(A)') "Three dimensions is not implemented."
     STOP
   ENDIF
   !Finish the equations set analytic field variables
-  CALL cmfe_EquationsSet_AnalyticCreateFinish(EquationsSet,Err)
+  CALL cmfe_EquationsSet_AnalyticCreateFinish(equationsSet,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! EQUATIONS
   !-----------------------------------------------------------------------------------------------------------
   
   !Create the equations set equations
-  CALL cmfe_Equations_Initialise(Equations,Err)
-  CALL cmfe_EquationsSet_EquationsCreateStart(EquationsSet,Equations,Err) 
+  CALL cmfe_Equations_Initialise(equations,err)
+  CALL cmfe_EquationsSet_EquationsCreateStart(equationsSet,equations,err) 
   !Set the equations matrices sparsity type
-  CALL cmfe_Equations_SparsityTypeSet(Equations,CMFE_EQUATIONS_SPARSE_MATRICES,Err)
+  CALL cmfe_Equations_SparsityTypeSet(equations,CMFE_EQUATIONS_SPARSE_MATRICES,err)
   !Set the equations set output
-  !CALL cmfe_Equations_OutputTypeSet(Equations,CMFE_EQUATIONS_NO_OUTPUT,Err)
-  !CALL cmfe_Equations_OutputTypeSet(Equations,CMFE_EQUATIONS_TIMING_OUTPUT,Err)
-  !CALL cmfe_Equations_OutputTypeSet(Equations,CMFE_EQUATIONS_MATRIX_OUTPUT,Err)
-  !CALL cmfe_Equations_OutputTypeSet(Equations,CMFE_EQUATIONS_ELEMENT_MATRIX_OUTPUT,Err)
+  !CALL cmfe_Equations_OutputTypeSet(equations,CMFE_EQUATIONS_NO_OUTPUT,err)
+  !CALL cmfe_Equations_OutputTypeSet(equations,CMFE_EQUATIONS_TIMING_OUTPUT,err)
+  !CALL cmfe_Equations_OutputTypeSet(equations,CMFE_EQUATIONS_MATRIX_OUTPUT,err)
+  !CALL cmfe_Equations_OutputTypeSet(equations,CMFE_EQUATIONS_ELEMENT_MATRIX_OUTPUT,err)
   !Finish the equations set equations
-  CALL cmfe_EquationsSet_EquationsCreateFinish(EquationsSet,Err)
+  CALL cmfe_EquationsSet_EquationsCreateFinish(equationsSet,err)
   
   !-----------------------------------------------------------------------------------------------------------
   ! PROBLEM
   !-----------------------------------------------------------------------------------------------------------
 
   !Create the problem
-  CALL cmfe_Problem_Initialise(Problem,Err)
-  CALL cmfe_Problem_CreateStart(ProblemUserNumber,context,[CMFE_PROBLEM_CLASSICAL_FIELD_CLASS, &
-    & CMFE_PROBLEM_ADVECTION_DIFFUSION_EQUATION_TYPE,CMFE_PROBLEM_LINEAR_SOURCE_STATIC_ADVEC_DIFF_SUBTYPE],Problem,Err)
+  CALL cmfe_Problem_Initialise(problem,err)
+  CALL cmfe_Problem_CreateStart(PROBLEM_USER_NUMBER,context,[CMFE_PROBLEM_CLASSICAL_FIELD_CLASS, &
+    & CMFE_PROBLEM_ADVECTION_DIFFUSION_EQUATION_TYPE,CMFE_PROBLEM_LINEAR_SOURCE_STATIC_ADVEC_DIFF_SUBTYPE],problem,err)
   !Finish the creation of a problem
-  CALL cmfe_Problem_CreateFinish(Problem,Err)
+  CALL cmfe_Problem_CreateFinish(problem,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! CONTROL LOOP
   !----------------------------------------------------------------------------------------------------------- 
   
   !Create the problem control
-  CALL cmfe_Problem_ControlLoopCreateStart(Problem,Err)
+  CALL cmfe_Problem_ControlLoopCreateStart(problem,err)
   !Finish creating the problem control loop
-  CALL cmfe_Problem_ControlLoopCreateFinish(Problem,Err)
+  CALL cmfe_Problem_ControlLoopCreateFinish(problem,err)
 
   !-----------------------------------------------------------------------------------------------------------
   ! SOLVER
   !-----------------------------------------------------------------------------------------------------------
   
   !Start the creation of the problem solver
-  CALL cmfe_Solver_Initialise(Solver,Err)
-  CALL cmfe_Problem_SolversCreateStart(Problem,Err)
-  CALL cmfe_Problem_SolverGet(Problem,CMFE_CONTROL_LOOP_NODE,1,Solver,Err)
-  CALL cmfe_Solver_OutputTypeSet(Solver,CMFE_SOLVER_PROGRESS_OUTPUT,Err)
+  CALL cmfe_Solver_Initialise(solver,err)
+  CALL cmfe_Problem_SolversCreateStart(problem,err)
+  CALL cmfe_Problem_SolverGet(problem,CMFE_CONTROL_LOOP_NODE,1,solver,err)
+  CALL cmfe_Solver_OutputTypeSet(solver,CMFE_SOLVER_PROGRESS_OUTPUT,err)
   !Finish the creation of the problem solver
-  CALL cmfe_Problem_SolversCreateFinish(Problem,Err)
+  CALL cmfe_Problem_SolversCreateFinish(problem,err)
   
   !-----------------------------------------------------------------------------------------------------------
   ! SOLVER EQUATIONS
   !-----------------------------------------------------------------------------------------------------------
  
   !Create the problem solver equations
-  CALL cmfe_Solver_Initialise(Solver,Err)
-  CALL cmfe_SolverEquations_Initialise(SolverEquations,Err)
-  CALL cmfe_Problem_SolverEquationsCreateStart(Problem,Err)
+  CALL cmfe_Solver_Initialise(solver,err)
+  CALL cmfe_SolverEquations_Initialise(solverEquations,err)
+  CALL cmfe_Problem_SolverEquationsCreateStart(problem,err)
   !Get the solve equations
-  CALL cmfe_Problem_SolverGet(Problem,CMFE_CONTROL_LOOP_NODE,1,Solver,Err)
-  CALL cmfe_Solver_SolverEquationsGet(Solver,SolverEquations,Err)
+  CALL cmfe_Problem_SolverGet(problem,CMFE_CONTROL_LOOP_NODE,1,solver,err)
+  CALL cmfe_Solver_SolverEquationsGet(solver,solverEquations,err)
   !Set the solver equations sparsity
-  CALL cmfe_SolverEquations_SparsityTypeSet(SolverEquations,CMFE_SOLVER_SPARSE_MATRICES,Err)
-  !CALL cmfe_SolverEquations_SparsityTypeSet(SolverEquations,CMFE_SOLVER_FULL_MATRICES,Err)  
+  CALL cmfe_SolverEquations_SparsityTypeSet(solverEquations,CMFE_SOLVER_SPARSE_MATRICES,err)
+  !CALL cmfe_SolverEquations_SparsityTypeSet(solverEquations,CMFE_SOLVER_FULL_MATRICES,err)  
   !Add in the equations set
-  CALL cmfe_SolverEquations_EquationsSetAdd(SolverEquations,EquationsSet,EquationsSetIndex,Err)
+  CALL cmfe_SolverEquations_EquationsSetAdd(solverEquations,equationsSet,equationsSetIndex,err)
   !Finish the creation of the problem solver equations
-  CALL cmfe_Problem_SolverEquationsCreateFinish(Problem,Err)
+  CALL cmfe_Problem_SolverEquationsCreateFinish(problem,err)
   
   !-----------------------------------------------------------------------------------------------------------
   ! BOUNDARY CONDITIONS
   !-----------------------------------------------------------------------------------------------------------  
   
-  CALL cmfe_BoundaryConditions_Initialise(BoundaryConditions,Err)
-  CALL cmfe_SolverEquations_BoundaryConditionsCreateStart(SolverEquations,BoundaryConditions,Err)
-  CALL cmfe_SolverEquations_BoundaryConditionsAnalytic(SolverEquations,Err)
-  CALL cmfe_SolverEquations_BoundaryConditionsCreateFinish(SolverEquations,Err)
+  CALL cmfe_BoundaryConditions_Initialise(boundaryConditions,err)
+  CALL cmfe_SolverEquations_BoundaryConditionsCreateStart(solverEquations,boundaryConditions,err)
+  CALL cmfe_SolverEquations_BoundaryConditionsAnalytic(solverEquations,err)
+  CALL cmfe_SolverEquations_BoundaryConditionsCreateFinish(solverEquations,err)
   
-!  !Create the equations set boundary conditions
-!  CALL cmfe_BoundaryConditions_Initialise(BoundaryConditions,Err)
-!  CALL cmfe_EquationsSetBoundaryConditionsCreateStart(EquationsSet,BoundaryConditions,Err)
-!  !Set the first node to 0.0 and the last node to 1.0
-!  FirstNodeNumber=1
-!  IF(NUMBER_GLOBAL_Z_ELEMENTS==0) THEN
-!    LastNodeNumber=(NUMBER_GLOBAL_X_ELEMENTS+1)*(NUMBER_GLOBAL_Y_ELEMENTS+1)
-!  ELSE
-!    LastNodeNumber=(NUMBER_GLOBAL_X_ELEMENTS+1)*(NUMBER_GLOBAL_Y_ELEMENTS+1)*(NUMBER_GLOBAL_Z_ELEMENTS+1)
-!  ENDIF
-!  CALL cmfe_BoundaryConditions_SetNode(BoundaryConditions,CMFE_FIELD_U_VARIABLE_TYPE,1,FirstNodeNumber,1, &
-!    & CMFE_BOUNDARY_CONDITION_FIXED,0.0_CMISSRP,Err)
-!  CALL cmfe_BoundaryConditions_SetNode(BoundaryConditions,CMFE_FIELD_DELUDELN_VARIABLE_TYPE,1,LastNodeNumber,1, &
-!    & CMFE_BOUNDARY_CONDITION_FIXED,1.0_CMISSRP,Err)
-!  !Finish the creation of the equations set boundary conditions
-!  CALL cmfe_EquationsSetBoundaryConditionsCreateFinish(EquationsSet,Err)
-
   !-----------------------------------------------------------------------------------------------------------
   ! SOLVE
   !----------------------------------------------------------------------------------------------------------- 
   
   !Solve the problem
-  CALL cmfe_Problem_Solve(Problem,Err)
+  CALL cmfe_Problem_Solve(problem,err)
   
   !-----------------------------------------------------------------------------------------------------------
   ! OUTPUT
   !-----------------------------------------------------------------------------------------------------------  
   
   !Output analytical solution
-  CALL cmfe_AnalyticAnalysis_Output(DependentField,"static_advection_diffusion_equation",Err)
+  CALL cmfe_AnalyticAnalysis_Output(dependentField,"static_advection_diffusion_equation",err)
   
-  EXPORT_FIELD=.TRUE.
-  IF(EXPORT_FIELD) THEN
-    CALL cmfe_Fields_Initialise(Fields,Err)
-    CALL cmfe_Fields_Create(Region,Fields,Err)
-    CALL cmfe_Fields_NodesExport(Fields,"static_advection_diffusion_equation","FORTRAN",Err)
-    CALL cmfe_Fields_ElementsExport(Fields,"static_advection_diffusion_equation","FORTRAN",Err)
-    CALL cmfe_Fields_Finalise(Fields,Err)
+  exportField=.TRUE.
+  IF(exportField) THEN
+    CALL cmfe_Fields_Initialise(fields,err)
+    CALL cmfe_Fields_Create(region,fields,err)
+    CALL cmfe_Fields_NodesExport(fields,"static_advection_diffusion_equation","FORTRAN",err)
+    CALL cmfe_Fields_ElementsExport(fields,"static_advection_diffusion_equation","FORTRAN",err)
+    CALL cmfe_Fields_Finalise(fields,err)
   ENDIF
 
   !Destroy the context
