@@ -73,6 +73,8 @@
   ! PROBLEM CONTROL PANEL
   !-----------------------------------------------------------------------------------------------------------
 
+  STOP
+  
   !Intialise OpenCMISS
   CALL cmfe_Initialise(err)
   CALL cmfe_ErrorHandlingModeSet(CMFE_ERRORS_TRAP_ERROR,err)
